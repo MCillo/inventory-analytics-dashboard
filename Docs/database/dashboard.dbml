@@ -1,0 +1,106 @@
+// Category 1 - M SubCategory 1 - M Product
+
+// Vendor 1 - M Product
+
+// Product 1 - M InventorySnapshot
+
+// Product 1 - M SalesHistory
+
+// ImportBatch 1 - M SalesHistory
+
+// ImportBatch 1 - M InventorySnapshot
+
+// Role 1 - M User
+
+Table Category {
+    CategoryId int [pk, increment, not null]
+    CategoryName varchar(50) [unique]
+}
+
+Table SubCategory {
+    SubCategoryId int [pk, increment, not null]
+    SubCategoryName varchar(50) [unique]
+
+    CategoryId int [not null, ref: > Category.CategoryId]
+}
+
+Table Vendor {
+    VendorId int [pk, increment, not null]
+    VendorName varchar(150) [unique]
+    ContactFirstName varchar(50)
+    ContactLastName varchar(50)
+    ContactPhone varchar(25)
+    ContactEmail varchar(255)
+
+}
+
+Table Product {
+    ProductId int [pk, increment, not null]
+    SKU int [unique]   // This would be our in house SKU that we use
+    ProductName varchar(200)
+    Size varchar(50)
+    DealLevel int(50)
+    CasePack int(50)
+    IsSeasonal boolean
+    IsDiscontinued boolean
+
+    SubCategoryId int [not null, ref: > SubCategory.SubCategoryId]
+    VendorId int [not null, ref: > Vendor.VendorId]
+}
+
+Table InventorySnapshot {
+    InventorySnapshotId int [pk, increment, not null]
+    QuantityOnHand int 
+    SnapshotDate datetime
+
+    ImportBatchId int [not null, ref: > ImportBatch.ImportBatchId]
+    ProductId int [not null, ref: > Product.ProductId]
+    
+}
+
+Table SalesHistory {
+    SalesHistoryId int [pk, increment, not null]
+    UnitsSold int
+    PeriodStartDate datetime
+    PeriodEndDate datetime
+
+    ImportBatchId int [not null, ref: > ImportBatch.ImportBatchId]
+    ProductId int [not null, ref: > Product.ProductId]
+    
+}
+
+Table ImportBatch {
+    ImportBatchId int [pk, increment, not null]
+    ImportDate datetime
+    FileName varchar(255)
+    ImportType varchar(50)
+    Status varchar(50)
+
+
+}
+
+Table Role {
+    RoleId int [pk, increment, not null, unique] 
+    RoleName varchar(50)
+    
+}
+
+Table User {
+    UserId int [pk, increment, not null]  
+    UserFirstName varchar(50)
+    UserLastName varchar(50)
+    UserEmail varchar(255)
+
+    RoleId int [not null, ref: > Role.RoleId]
+}
+
+
+Table ProductFinancial {
+    ProductFinancialId int [pk, increment]
+
+    ProductId int [ref: > Product.ProductId]
+
+    RetailPrice decimal
+    CostPrice decimal
+    MarginPercent decimal
+}
