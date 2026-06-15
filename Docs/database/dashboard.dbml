@@ -1,16 +1,18 @@
+//Table Relationships
+
 // Category 1 - M SubCategory 1 - M Product
-
 // Vendor 1 - M Product
-
+// SalesRep 1 - M Product
 // Product 1 - M InventorySnapshot
-
 // Product 1 - M SalesHistory
-
 // ImportBatch 1 - M SalesHistory
-
 // ImportBatch 1 - M InventorySnapshot
-
 // Role 1 - M User
+// Vendor 1 - M SalesRep
+// OrderScenario 1 - M OrderScenarioItem
+// Product 1 - M OrderScenarioItem
+// Product 1 - M ProductFinancial
+// ImportBatch 1 - M ProductFinancial
 
 Table Category {
     CategoryId int [pk, increment, not null]
@@ -19,7 +21,7 @@ Table Category {
 
 Table SubCategory {
     SubCategoryId int [pk, increment, not null]
-    SubCategoryName varchar(50) [unique]
+    SubCategoryName varchar(50)
 
     CategoryId int [not null, ref: > Category.CategoryId]
 }
@@ -27,31 +29,34 @@ Table SubCategory {
 Table Vendor {
     VendorId int [pk, increment, not null]
     VendorName varchar(150) [unique]
+}
+
+Table  SalesRep {
+    SalesRepId int [pk, increment, not null]
     ContactFirstName varchar(50)
     ContactLastName varchar(50)
     ContactPhone varchar(25)
     ContactEmail varchar(255)
+    SalesRepPosition varchar(50)
 
+    VendorId int [not null, ref: > Vendor.VendorId]
 }
 
 Table Product {
     ProductId int [pk, increment, not null]
-    SKU int [unique]   // This would be our in house SKU that we use
-    ProductName varchar(200)
+    SKU int [unique]   // This would be our in house SKU that we use, it can be null for New products that haven't been added to our system yet 
     Size varchar(50)
-    DealLevel int(50)
-    CasePack int(50)
-    IsSeasonal boolean
-    IsDiscontinued boolean
+    DealLevel int // This is a numeric representation of the deal level, with 1 being the lowest and 5 being the highest. 
 
-    SubCategoryId int [not null, ref: > SubCategory.SubCategoryId]
+    SubCategoryId int [ref: > SubCategory.SubCategoryId]
     VendorId int [not null, ref: > Vendor.VendorId]
+    SalesRepId int [ref: > SalesRep.SalesRepId]
 }
 
 Table InventorySnapshot {
     InventorySnapshotId int [pk, increment, not null]
     QuantityOnHand int 
-    SnapshotDate datetime
+    SnapshotDate datetime // The date and time when the inventory snapshot was taken 
 
     ImportBatchId int [not null, ref: > ImportBatch.ImportBatchId]
     ProductId int [not null, ref: > Product.ProductId]
@@ -68,20 +73,42 @@ Table SalesHistory {
     ProductId int [not null, ref: > Product.ProductId]
     
 }
+ 
+Table OrderScenario {
+  OrderScenarioId int [pk, increment, not null]
+  ScenarioName varchar(100)
+  ScenarioDate datetime
+  DealDescription varchar(150)
+  TotalDealCases int
+  Notes varchar(255)
+
+  VendorId int [not null, ref: > Vendor.VendorId]
+  SalesRepId int [ref: > SalesRep.SalesRepId]
+  UserId int [ref: > User.UserId]
+}
+
+Table OrderScenarioItem {
+  OrderScenarioItemId int [pk, increment, not null]
+
+  OrderScenarioId int [not null, ref: > OrderScenario.OrderScenarioId]
+  ProductId int [not null, ref: > Product.ProductId]
+
+  ProposedCases int
+  ProposedBottles int
+}
 
 Table ImportBatch {
     ImportBatchId int [pk, increment, not null]
-    ImportDate datetime
+    ImportDate datetime // The date and time when the import was performed
     FileName varchar(255)
     ImportType varchar(50)
     Status varchar(50)
 
-
 }
 
 Table Role {
-    RoleId int [pk, increment, not null, unique] 
-    RoleName varchar(50)
+    RoleId int [pk, increment, not null] 
+    RoleName varchar(50) [unique]
     
 }
 
@@ -92,15 +119,23 @@ Table User {
     UserEmail varchar(255)
 
     RoleId int [not null, ref: > Role.RoleId]
+
+    PasswordHash varchar(255) // to be added in a later version when I implement authentication
+    MfaEnabled boolean // to be added in a later version when I implement authentication
+    IsActive boolean // to be added in a later version when I implement authentication
+
 }
 
 
 Table ProductFinancial {
     ProductFinancialId int [pk, increment]
+    EffectiveDate datetime
 
-    ProductId int [ref: > Product.ProductId]
+    ProductId int [ref: > Product.ProductId, not null]
+    ImportBatchId int [ref: > ImportBatch.ImportBatchId, not null]
 
     RetailPrice decimal
     CostPrice decimal
     MarginPercent decimal
+    MarginDollars decimal
 }
