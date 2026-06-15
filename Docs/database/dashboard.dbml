@@ -45,11 +45,12 @@ Table  SalesRep {
 Table Product {
     ProductId int [pk, increment, not null]
     SKU int [unique]   // This would be our in house SKU that we use, it can be null for New products that haven't been added to our system yet 
+    ProductName varchar(255)
     Size varchar(50)
     DealLevel int // This is a numeric representation of the deal level, with 1 being the lowest and 5 being the highest. 
 
     SubCategoryId int [ref: > SubCategory.SubCategoryId]
-    VendorId int [not null, ref: > Vendor.VendorId]
+    VendorId int [ref: > Vendor.VendorId]
     SalesRepId int [ref: > SalesRep.SalesRepId]
 }
 
@@ -75,23 +76,27 @@ Table SalesHistory {
 }
  
 Table OrderScenario {
-  OrderScenarioId int [pk, increment, not null]
+  OrderScenarioId int [pk, increment]
   ScenarioName varchar(100)
   ScenarioDate datetime
   DealDescription varchar(150)
   TotalDealCases int
   Notes varchar(255)
 
-  VendorId int [not null, ref: > Vendor.VendorId]
+  VendorId int [ref: > Vendor.VendorId]
   SalesRepId int [ref: > SalesRep.SalesRepId]
-  UserId int [ref: > User.UserId]
+  UserId int [ref: > AppUser.UserId]
 }
 
 Table OrderScenarioItem {
-  OrderScenarioItemId int [pk, increment, not null]
+  OrderScenarioItemId int [pk, increment]
 
-  OrderScenarioId int [not null, ref: > OrderScenario.OrderScenarioId]
-  ProductId int [not null, ref: > Product.ProductId]
+  OrderScenarioId int [ref: > OrderScenario.OrderScenarioId]
+  ProductId int [ref: > Product.ProductId]
+
+  TempProductName varchar(150)
+  TempSize varchar(50)
+  TempNotes varchar(255)
 
   ProposedCases int
   ProposedBottles int
@@ -112,8 +117,8 @@ Table Role {
     
 }
 
-Table User {
-    UserId int [pk, increment, not null]  
+Table AppUser {
+    UserId int [pk, increment]  
     UserFirstName varchar(50)
     UserLastName varchar(50)
     UserEmail varchar(255)
