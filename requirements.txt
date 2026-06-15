@@ -1,0 +1,89 @@
+# 1. Import needed Python modules
+
+# 2. Define the project root path
+# Hint:
+# This file is located at:
+# src/database/create_database.py
+#
+# The project root is two folders above this file.
+#
+# Example:
+# current file -> database folder -> src folder -> project root
+
+# 3. Define the database folder path
+# Example:
+# project_root / "database"
+
+# 4. Define the database file path
+# Example:
+# database_folder / "inventory.db"
+
+# 5. Make sure the database folder exists
+# If the folder does not exist, create it
+
+# 6. Create a function named create_connection()
+# This function should:
+# - connect to the SQLite database file
+# - return the connection object
+
+# 7. Create a function named create_tables(connection)
+# This function should:
+# - create a cursor
+# - execute SQL CREATE TABLE statements
+# - commit the changes
+
+# 8. Inside create_tables(connection), create the Category table
+# Fields:
+# - CategoryId: integer primary key autoincrement
+# - CategoryName: text, required, unique
+
+
+# 9. Create the SubCategory table
+# Fields:
+# - SubCategoryId: integer primary key autoincrement
+# - SubCategoryName: text, required
+# - CategoryId: integer, required, foreign key to Category(CategoryId)
+
+
+# 10. Create the Vendor table
+# Fields:
+# - VendorId: integer primary key autoincrement
+# - VendorName: text, required, unique
+
+
+# 11. Create the SalesRep table
+# Fields:
+# - SalesRepId: integer primary key autoincrement
+# - ContactFirstName: text
+# - ContactLastName: text
+# - ContactPhone: text
+# - ContactEmail: text
+# - SalesRepPosition: text
+# - VendorId: integer, required, foreign key to Vendor(VendorId)
+
+
+# 12. Create the Product table
+# Fields:
+# - ProductId: integer primary key autoincrement
+# - SKU: integer, unique, nullable
+# - ProductName: text, required
+# - Size: text
+# - DealLevel: integer
+# - CasePack: integer
+# - IsSeasonal: integer/boolean
+# - IsDiscontinued: integer/boolean
+# - SubCategoryId: integer, required, foreign key to SubCategory(SubCategoryId)
+# - VendorId: integer, required, foreign key to Vendor(VendorId)
+# - SalesRepId: integer, nullable, foreign key to SalesRep(SalesRepId)
+
+
+# 13. Enable foreign key enforcement in SQLite
+# SQLite does not always enforce foreign keys unless PRAGMA foreign_keys = ON is used
+
+
+# 14. Create a main() function
+# This function should:
+# - create the database connection
+# - call create_tables(connection)
+# - close the connection
+# - print a success message
