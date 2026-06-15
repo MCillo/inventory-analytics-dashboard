@@ -160,6 +160,10 @@ venv.bak/
 # Production Data
 data/production/
 
+# SQLite database files
+*.db
+*.db-journal
+
 # MacOS specific files
 .DS_Store
 
