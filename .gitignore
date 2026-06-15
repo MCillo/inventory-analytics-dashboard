@@ -160,6 +160,9 @@ venv.bak/
 # Production Data
 data/production/
 
+# MacOS specific files
+.DS_Store
+
 # Spyder project settings
 .spyderproject
 .spyproject
