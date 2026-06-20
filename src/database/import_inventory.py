@@ -44,12 +44,14 @@ def inspect_inventory_file(file_path):
             "Gross M %": "gross_margin_percent"
         })
 
+        """
         print("\nCleaned columns:")
         for column in inventory_data.columns:
             print(f"- {column}")
 
         print("\nFirst 5 rows:")
         print(inventory_data.head())
+        """
 
         return inventory_data
 
@@ -72,6 +74,10 @@ def clean_inventory_data(inventory_data):
         "gross_margin_dollars",
         "gross_margin_percent"
     ]]
+
+    inventory_data = inventory_data[
+        ~inventory_data["description"].astype(str).str.startswith("XX")
+    ]
 
     inventory_data["item_no"] = inventory_data["item_no"].astype("Int64")
     inventory_data["qty_on_hand"] = inventory_data["qty_on_hand"].astype("Int64")
@@ -113,7 +119,7 @@ def insert_products(connection, inventory_data):
 
     products_inserted = 0
 
-    for _, row in inventory_data.iterrows():
+    for row in inventory_data.itertuples(index=False):
         cursor.execute("""
             INSERT OR IGNORE INTO Product (
                 SKU,
@@ -121,8 +127,8 @@ def insert_products(connection, inventory_data):
             )
             VALUES (?, ?);
         """, (
-            int(row["item_no"]),
-            row["description"]
+            int(row.item_no),
+            row.description
         ))
 
         if cursor.rowcount > 0:
@@ -142,14 +148,77 @@ def show_product_count(connection):
 
     print(f"Total products in database: {product_count}")
 
+def get_product_id_by_sku(connection, sku):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT ProductId
+        FROM Product
+        WHERE SKU = ?;
+    """, (
+        int(sku),
+    ))
+
+    result = cursor.fetchone()
+
+    if result:
+        return result[0]
+
+    return None
+
+def test_product_lookup(connection):
+    product_id = get_product_id_by_sku(connection, 216750)
+
+    print(f"Product ID for SKU 216750: {product_id}")
+
+
+def insert_inventory_snapshots(connection, inventory_data, import_batch_id):
+    cursor = connection.cursor()
+
+    snapshots_inserted = 0
+
+    for row in inventory_data.itertuples(index=False):
+        sku = row.item_no
+        quantity_on_hand = row.qty_on_hand
+
+        product_id = get_product_id_by_sku(connection, sku)
+
+        if product_id:
+            cursor.execute("""
+                INSERT INTO InventorySnapshot (
+                    QuantityOnHand,
+                    SnapshotDate,
+                    ImportBatchId,
+                    ProductId
+                )
+                VALUES (?, ?, ?, ?);
+            """, (
+                int(quantity_on_hand),
+                datetime.now().isoformat(),
+                import_batch_id,
+                product_id
+            ))
+
+            snapshots_inserted += 1
+
+        else:
+            print(f"No product was found for SKU: {sku}")
+
+    return snapshots_inserted
 
 def main():
     inventory_data = inspect_inventory_file(inventory_file)
 
     cleaned_inventory_data = clean_inventory_data(inventory_data)
 
-    print("\nCleaned inventory data:")
-    print(cleaned_inventory_data.head())
+    #print("\nCleaned inventory data:")
+    #print(cleaned_inventory_data.head())
+
+    duplicate_skus = cleaned_inventory_data[
+    cleaned_inventory_data.duplicated(subset=["item_no"], keep=False)
+]
+    print("\nDuplicate SKUs found:")
+    print(duplicate_skus)
 
     connection = create_connection()
 
@@ -161,12 +230,20 @@ def main():
 
     products_inserted = insert_products(connection, cleaned_inventory_data)
 
+    snapshots_inserted = insert_inventory_snapshots(
+    connection,
+    cleaned_inventory_data,
+    import_batch_id
+    )
+
     connection.commit()
 
     print(f"\nImport batch created successfully with ID: {import_batch_id}")
     print(f"Products inserted successfully: {products_inserted}")
+    print(f"Inventory snapshots inserted successfully: {snapshots_inserted}")
 
     show_product_count(connection)
+    test_product_lookup(connection)
 
     connection.close()
 
