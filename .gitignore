@@ -160,6 +160,10 @@ venv.bak/
 # Production Data
 data/production/
 
+# Excel temporary files
+~$*.xls
+~$*.xlsx
+
 # SQLite database files
 *.db
 *.db-journal
