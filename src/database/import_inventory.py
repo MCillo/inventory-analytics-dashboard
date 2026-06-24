@@ -29,6 +29,9 @@ database_file = root_path / "database" / "inventory.db"
 # Function to read spreadsheet file 
 def inspect_inventory_file(file_path):
     try:
+
+        print(f"Reading inventory file from: {file_path}")
+
         # Read data from Spreadsheet and use second row as column headers
         inventory_data = pd.read_excel(file_path, header=1)
 
