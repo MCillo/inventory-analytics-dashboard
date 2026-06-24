@@ -61,10 +61,10 @@ def show_latest_inventory_snapshot(connection):
             Product.SKU,
             Product.ProductName,
             InventorySnapshot.QuantityOnHand,
-            ProductFinancial.CostPrice,
-            ProductFinancial.RetailPrice,
-            ProductFinancial.MarginPercent,
-            ProductFinancial.MarginDollars
+            ROUND(ProductFinancial.CostPrice, 2),
+            ROUND(ProductFinancial.RetailPrice, 2),
+            ROUND(ProductFinancial.MarginPercent, 2),
+            ROUND(ProductFinancial.MarginDollars, 2)
         FROM Product
         JOIN InventorySnapshot
             ON Product.ProductId = InventorySnapshot.ProductId
@@ -85,7 +85,7 @@ def show_latest_inventory_snapshot(connection):
 
     results = cursor.fetchall()
 
-    print("\nProduct Quantities:")
+    print("\nLatest Inventory Snapshot:")
     for row in results:
         print(row)
 
