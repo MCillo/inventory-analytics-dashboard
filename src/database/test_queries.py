@@ -12,8 +12,6 @@ before implementing GUI and reports
 from pathlib import Path
 # Module to work with SQLite
 import sqlite3
-# Module for working with datetime format
-from datetime import datetime
 
 # Establish the root path for the file tree
 root_path = Path(__file__).resolve().parents[2]
@@ -54,6 +52,42 @@ def show_product_quantity(connection):
     for row in results:
         print(row)
 
+# Function to show latest inventory snapshot
+def show_latest_inventory_snapshot(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            InventorySnapshot.QuantityOnHand,
+            ProductFinancial.CostPrice,
+            ProductFinancial.RetailPrice,
+            ProductFinancial.MarginPercent,
+            ProductFinancial.MarginDollars
+        FROM Product
+        JOIN InventorySnapshot
+            ON Product.ProductId = InventorySnapshot.ProductId
+        JOIN ProductFinancial
+            ON Product.ProductId = ProductFinancial.ProductId
+        WHERE InventorySnapshot.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        AND ProductFinancial.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        LIMIT 10;            
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nProduct Quantities:")
+    for row in results:
+        print(row)
 
 # Main Function
 def main():
@@ -61,6 +95,7 @@ def main():
     connection = create_connection()
 
     show_product_quantity(connection)
+    show_latest_inventory_snapshot(connection)
 
     connection.close()
 
