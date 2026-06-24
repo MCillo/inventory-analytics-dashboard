@@ -286,6 +286,7 @@ def show_product_financials_count(connection):
 
 
 def main():
+    
     inventory_data = inspect_inventory_file(inventory_file)
 
     cleaned_inventory_data = clean_inventory_data(inventory_data)
