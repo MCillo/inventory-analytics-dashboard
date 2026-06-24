@@ -29,7 +29,7 @@ database_file = root_path / "database" / "inventory.db"
 # Function to read spreadsheet file 
 def inspect_inventory_file(file_path):
     try:
-        # 
+        # Read data from Spreadsheet and use second row as column headers
         inventory_data = pd.read_excel(file_path, header=1)
 
         print(f"Inventory file loaded successfully: {file_path.name}")
@@ -114,6 +114,18 @@ def create_import_batch(connection, file_name, import_type):
 
     return cursor.lastrowid
 
+def show_import_batch_count(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM ImportBatch;
+    """)
+
+    import_batch_count = cursor.fetchone()[0]
+
+    print(f"Total import batches in database: {import_batch_count}")
+
 def insert_products(connection, inventory_data):
     cursor = connection.cursor()
 
@@ -166,11 +178,13 @@ def get_product_id_by_sku(connection, sku):
 
     return None
 
+"""
+Function to test lookup product may be used later for search by sku function
 def test_product_lookup(connection):
     product_id = get_product_id_by_sku(connection, 216750)
 
     print(f"Product ID for SKU 216750: {product_id}")
-
+"""
 
 def insert_inventory_snapshots(connection, inventory_data, import_batch_id):
     cursor = connection.cursor()
@@ -206,6 +220,71 @@ def insert_inventory_snapshots(connection, inventory_data, import_batch_id):
 
     return snapshots_inserted
 
+def show_inventory_snapshots_count(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM InventorySnapshot;
+    """)
+
+    inventory_snapshots_count = cursor.fetchone()[0]
+
+    print(f"Total Inventory Snapshots in database: {inventory_snapshots_count}")
+
+def insert_product_financials(connection, inventory_data, import_batch_id):
+
+    cursor = connection.cursor()
+
+    financials_inserted = 0
+
+    for row in inventory_data.itertuples(index=False):
+
+        sku = row.item_no
+        product_id = get_product_id_by_sku(connection, sku)
+
+        if product_id:
+            cursor.execute("""
+                INSERT INTO ProductFinancial (
+                    EffectiveDate,
+                    ProductId,
+                    ImportBatchId,
+                    RetailPrice,
+                    CostPrice,
+                    MarginPercent,
+                    MarginDollars
+                )
+                VALUES (?,?,?,?,?,?,?);
+            """, (
+                datetime.now().isoformat(),
+                product_id,
+                import_batch_id,
+                row.base_price,
+                row.avg_cost,
+                row.gross_margin_percent,
+                row.gross_margin_dollars
+            ))
+           
+            financials_inserted += 1
+
+        else:
+            print(f"No product was found for SKU: {sku} ")
+
+    return financials_inserted
+
+def show_product_financials_count(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM ProductFinancial;
+    """)
+
+    product_financials_count = cursor.fetchone()[0]
+
+    print(f"Total Product Financials in database: {product_financials_count}")
+
+
 def main():
     inventory_data = inspect_inventory_file(inventory_file)
 
@@ -215,10 +294,14 @@ def main():
     #print(cleaned_inventory_data.head())
 
     duplicate_skus = cleaned_inventory_data[
-    cleaned_inventory_data.duplicated(subset=["item_no"], keep=False)
-]
-    print("\nDuplicate SKUs found:")
-    print(duplicate_skus)
+        cleaned_inventory_data.duplicated(subset=["item_no"], keep=False)
+    ]
+
+    if duplicate_skus.empty:
+        print("\nDuplicate SKUs found: None")
+    else:
+        print("\nDuplicate SKUs found:")
+        print(duplicate_skus)
 
     connection = create_connection()
 
@@ -231,9 +314,15 @@ def main():
     products_inserted = insert_products(connection, cleaned_inventory_data)
 
     snapshots_inserted = insert_inventory_snapshots(
-    connection,
-    cleaned_inventory_data,
-    import_batch_id
+        connection,
+        cleaned_inventory_data,
+        import_batch_id
+    )
+
+    financials_inserted = insert_product_financials(
+        connection,
+        cleaned_inventory_data,
+        import_batch_id
     )
 
     connection.commit()
@@ -241,10 +330,13 @@ def main():
     print(f"\nImport batch created successfully with ID: {import_batch_id}")
     print(f"Products inserted successfully: {products_inserted}")
     print(f"Inventory snapshots inserted successfully: {snapshots_inserted}")
+    print(f"Product financial records inserted successfully: {financials_inserted}")
 
     show_product_count(connection)
-    test_product_lookup(connection)
-
+    # test_product_lookup(connection)
+    show_import_batch_count(connection)
+    show_inventory_snapshots_count(connection)
+    show_product_financials_count(connection)
     connection.close()
 
 if __name__ == "__main__":
