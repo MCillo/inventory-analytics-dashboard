@@ -89,6 +89,51 @@ def show_latest_inventory_snapshot(connection):
     for row in results:
         print(row)
 
+def get_sales_history(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            InventorySnapshot.QuantityOnHand,
+            SalesHistory.UnitsSold,
+            CASE
+                WHEN SalesHistory.UnitsSold > 0
+                THEN ROUND(InventorySnapshot.QuantityOnHand * 1.0 / SalesHistory.UnitsSold, 2)
+                ELSE NULL
+            END AS EstimatedWeeksOnHand
+        FROM Product
+        JOIN InventorySnapshot
+            ON Product.ProductId = InventorySnapshot.ProductId
+        JOIN SalesHistory
+            ON Product.ProductId = SalesHistory.ProductId
+        WHERE InventorySnapshot.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        AND SalesHistory.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'SalesHistory'
+        )
+        AND SalesHistory.UnitsSold > 0
+        ORDER BY EstimatedWeeksOnHand ASC
+        LIMIT 20;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nLatest Estimated Weeks on Hand:")
+    print(f"{'SKU':<10} {'ProductName':<35} {'QtyOnHand':<10} {'UnitsSold':<10} {'EstWOH':<10}")
+    print("-" * 80)
+
+    for row in results:
+        sku, product_name, qty_on_hand, units_sold, estimated_woh = row
+
+        print(f"{sku:<10} {product_name:<35} {qty_on_hand:<10} {units_sold:<10} {estimated_woh:<10}")
+
 # Main Function
 def main():
     
@@ -96,6 +141,7 @@ def main():
 
     show_product_quantity(connection)
     show_latest_inventory_snapshot(connection)
+    get_sales_history(connection)
 
     connection.close()
 
