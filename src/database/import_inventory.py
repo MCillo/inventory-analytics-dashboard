@@ -136,14 +136,19 @@ def insert_products(connection, inventory_data):
 
     for row in inventory_data.itertuples(index=False):
         cursor.execute("""
-            INSERT OR IGNORE INTO Product (
+            INSERT INTO Product (
                 SKU,
-                ProductName
+                ProductName,
+                IsInPOS
             )
-            VALUES (?, ?);
+            VALUES (?, ?, ?)
+            ON CONFLICT(SKU) DO UPDATE SET
+                ProductName = excluded.ProductName,
+                IsInPOS = 1;
         """, (
             int(row.item_no),
-            row.description
+            row.description,
+            1
         ))
 
         if cursor.rowcount > 0:
