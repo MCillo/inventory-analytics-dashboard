@@ -40,11 +40,12 @@
 |------------|-----------|-------------|--------|----------|
 |ProductId | int | Product table primary key | Database| Yes |
 |SKU | int | Store SKU number| Sales Report | No |
-|ProductName| varchar(200) | general description of product | Database| Yes |
+|ProductName| varchar(200) | general description of product | Invnetory Report / Manual Entry| Yes |
 |Size| varchar(50)| product size | Database| No |
 |CasePack | int | case or pack size | Database| No |
 |IsSeasonal | boolean | Products Seasonal Status | Database | No |
-|IsDiscontinued | boolean | Products status | Database | No |
+|IsDiscontinued | boolean | Products active/discontinued status | Database | No |
+|IsInPos | int / Boolean | Indicates whether the product currently exists in the POS system | Database / Manual Entry /Inventory Report | Yes |
 |DealLevel | int | the deal level of the product | Database | No |
 |SubCategoryId | int | the subcategory of the product | Database | No |
 |VendorId  | int | foreign key for the vendor table | No |
