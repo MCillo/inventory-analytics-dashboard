@@ -7,7 +7,7 @@
 // Product 1 - M SalesHistory
 // ImportBatch 1 - M SalesHistory
 // ImportBatch 1 - M InventorySnapshot
-// Role 1 - M User
+// Role 1 - M AppUser
 // Vendor 1 - M SalesRep
 // OrderScenario 1 - M OrderScenarioItem
 // Product 1 - M OrderScenarioItem
