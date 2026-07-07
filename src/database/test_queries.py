@@ -657,6 +657,60 @@ def show_inventory_exceptions(connection):
 
     cursor.execute("""
         SELECT
+            Product.SKU,
+            Product.ProductName,
+            InventorySnapshot.QuantityOnHand
+        FROM Product
+        JOIN InventorySnapshot
+            ON Product.ProductId = InventorySnapshot.ProductId
+        WHERE InventorySnapshot.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        AND InventorySnapshot.QuantityOnHand < 0
+        ORDER BY InventorySnapshot.QuantityOnHand ASC;
+    """)
+
+    results = cursor.fetchall()
+
+    if results:
+        print("\nInventory Exceptions")
+        print(
+            f"{'SKU':<10}"
+            f"{'ProductName':<40}"
+            f"{'QTY On Hand':>12}"
+        )
+        print("-" * 62)
+
+        for row in results:
+            sku, product_name, quantity_on_hand = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = (
+                "No Product Name"
+                if product_name is None
+                else product_name
+            )
+
+            if len(product_name) > 40:
+                product_name = product_name[:37] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{quantity_on_hand:>12}"
+            )
+
+    else:
+        print("\nNo negative inventory exceptions found.")
+
+# Function to Show Zero or Negative stock With Sales
+def show_zero_stock_negative_sales(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
             Product.SKU AS SKU,
             Product.ProductName AS ProductName,
             InventorySnapshot.QuantityOnHand AS QTYOnHand
@@ -665,7 +719,7 @@ def show_inventory_exceptions(connection):
         JOIN InventorySnapshot
         ON Product.ProductId = InventorySnapshot.ProductId
         HAVING QTYOnHand < 0
-        ORDER BY QTYOnHand ASC;
+        ORDER BY QTYOnHand ASC; 
     """)
 
 # Function to Get Sales History
@@ -732,7 +786,7 @@ def main():
     #show_latest_sales_batch_summary(connection)
     #show_weeks_on_hand_report(connection)
     #show_low_weeks_on_hand(connection)
-    show_inventory_exceptions
+    show_inventory_exceptions(connection)
     #show_product_quantity(connection)
     #show_latest_inventory_snapshot(connection)
     #get_sales_history(connection)
