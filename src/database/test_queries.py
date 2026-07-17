@@ -26,6 +26,7 @@ def create_connection():
     try:
         connection = sqlite3.connect(database_file)
         connection.execute("PRAGMA foreign_keys = ON;")
+        print("\nConnection Succesful")
         return connection
 
     except sqlite3.Error as error:
@@ -55,14 +56,26 @@ def show_import_batch_count(connection):
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT 
+            COUNT(*),
+            ImportType,
+            Status    
         FROM ImportBatch
     """)
 
-    results = cursor.fetchone()
+    results = cursor.fetchall()
 
-    print("\nBatch Count")
-    print(results)
+    if results:
+        print("\nBatch Count")
+        print(f"{'COUNT':<15} {'ImportType':<20} {'Status':<20}")
+        print("-" * 55)
+
+        for row in results:
+            count, import_type, status = row
+            print({f"{count:<15} {import_type:<20} {status:<20}"})
+
+    else:
+        print("\nNo Import Batches Found.")
 
 # Function to show the latest Import Batch Id
 def show_latest_import_batch_id(connection):
@@ -710,17 +723,111 @@ def show_zero_stock_negative_sales(connection):
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT
-            Product.SKU AS SKU,
-            Product.ProductName AS ProductName,
-            InventorySnapshot.QuantityOnHand AS QTYOnHand
-        FROM
-            Product
-        JOIN InventorySnapshot
+    SELECT
+        Product.SKU AS SKU,
+        Product.ProductName AS ProductName,
+        InventorySnapshot.QuantityOnHand AS QTYOnHand
+    FROM Product
+    JOIN InventorySnapshot
         ON Product.ProductId = InventorySnapshot.ProductId
-        HAVING QTYOnHand < 0
-        ORDER BY QTYOnHand ASC; 
+    WHERE InventorySnapshot.ImportBatchId = (
+        SELECT MAX(ImportBatchId)
+        FROM ImportBatch
+        WHERE ImportType = 'Inventory'
+    )
+    AND InventorySnapshot.QuantityOnHand < 0
+    ORDER BY InventorySnapshot.QuantityOnHand ASC; 
     """)
+
+    results = cursor.fetchall()
+
+    if results:
+        print("\nNegative Sales")
+        print(
+            f"{'SKU':<10}"
+            f"{'ProductName':<40}"
+            f"{'QTY On Hand':>12}"
+        )
+        print("-" * 62)
+
+        for row in results:
+            sku, product_name, quantity_on_hand = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = (
+                "No Product Name"
+                if product_name is None
+                else product_name
+            )
+
+            if len(product_name) > 40:
+                product_name = product_name[:37] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{quantity_on_hand:>12}"
+            )
+
+    else:
+        print("\nNo Negative Sales Found.")
+
+# Function to show actively stocked skus
+def show_active_stocked_skus(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            InventorySnapshot.QuantityOnHand
+        FROM Product
+        JOIN InventorySnapshot
+            ON Product.ProductId = InventorySnapshot.ProductId
+        WHERE InventorySnapshot.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        AND InventorySnapshot.QuantityOnHand > 0
+        ORDER BY InventorySnapshot.QuantityOnHand DESC; 
+    """)
+
+    results = cursor.fetchall()
+
+    if results:
+        active_sku_count = len(results)
+        total_qty_on_hand = sum(row[2] for row in results)
+
+        print("\nActive SKU's")
+        print(f"Active Stocked SKUs Returned: {active_sku_count}")
+        print(f"Total Quantity On Hand: {total_qty_on_hand}")
+        print()
+
+        print(
+            f"{'SKU':<10} "
+            f"{'ProductName':<40} "
+            f"{'QTY On Hand':>12}"
+        )
+        print("-" * 68)
+
+        for row in results:
+            sku, product_name, quantity_on_hand = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+
+            if len(product_name) > 40:
+                product_name = product_name[:37] + "..."
+
+            print(
+                f"{sku:<10} "
+                f"{product_name:<40} "
+                f"{quantity_on_hand:>12}"
+            )
+
+    else:
+        print("\nNo active stocked SKUs found.")
 
 # Function to Get Sales History
 def get_sales_history(connection):
@@ -768,15 +875,246 @@ def get_sales_history(connection):
 
         print(f"{sku:<10} {product_name:<35} {qty_on_hand:>10} {units_sold:>10} {estimated_woh:>10}")
 
+# Function to Get Latest Sales History
+def get_latest_sales_history(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            SalesHistory.UnitsSold,
+            SalesHistory.PeriodStartDate,
+            SalesHistory.PeriodEndDate
+        FROM Product
+        JOIN InventorySnapshot
+            ON Product.ProductId = InventorySnapshot.ProductId
+        JOIN SalesHistory
+            ON Product.ProductId = SalesHistory.ProductId
+        WHERE InventorySnapshot.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        AND SalesHistory.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'SalesHistory'
+        )
+        AND SalesHistory.UnitsSold > 0
+        ORDER BY UnitsSold DESC
+        ;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nLatest Sales History:")
+
+    if results:
+        first_row = results[0]
+        period_start_date = first_row[3]
+        period_end_date = first_row[4]
+
+        formatted_start_date = datetime.fromisoformat(period_start_date).strftime("%B %d")
+        formatted_end_date = datetime.fromisoformat(period_end_date).strftime("%d, %Y")
+
+        print(f"Sales Period: Week of {formatted_start_date} - {formatted_end_date}")
+        print()
+
+        print(
+            f"{'SKU':<10}"
+            f"{'Product Name':<40}"
+            f"{'Units Sold':>10}"
+        )
+        print("-" * 60)
+
+        for row in results:
+            sku, product_name, units_sold, period_start_date, period_end_date = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+
+            if len(product_name) > 35:
+                product_name = product_name[:32] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{units_sold:>10}"
+            )
+
+    else:
+        print("No sales history records found.")
+
+# Function to Show Latest Product Financials
+def show_latest_product_financials(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            ProductFinancial.CostPrice,
+            ProductFinancial.RetailPrice,
+            ProductFinancial.MarginDollars,
+            ProductFinancial.MarginPercent,
+            ProductFinancial.EffectiveDate
+        FROM
+            Product
+        JOIN ProductFinancial
+            ON ProductFinancial.ProductId = Product.ProductId
+        WHERE ProductFinancial.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        ORDER BY SKU ASC
+        LIMIT 15;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nLatest Product Financials.")
+
+    if results:
+        first_row = results[0]
+        effective_date = first_row[6]
+
+        formatted_effective_date = datetime.fromisoformat(effective_date).strftime("%B %d")
+
+        print(f"Financial Information as of: {formatted_effective_date}")
+        print()
+
+        print(
+            f"{'SKU':<10}"
+            f"{'Product Name':<40}"
+            f"{'Cost':>12}"
+            f"{'Retail':>12}"
+            f"{'Margin Dollars':>18}"
+            f"{'Margin Percent':>18}"
+
+        )
+        print("-" * 110)
+
+        for row in results:
+            sku, product_name, cost_price, retail_price, margin_dollars, margin_percent, effective_date = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+            cost_price = "N/A" if cost_price is None else f"$ {cost_price:.2f}"
+            retail_price = "N/A" if retail_price is None else f"$ {retail_price:.2f}"
+            margin_dollars = "N/A" if margin_dollars is None else f"$ {margin_dollars:.2f}"
+            margin_percent = "N/A" if margin_percent is None else f"{margin_percent:.2f} %"
+
+            if len(product_name) > 35:
+                product_name = product_name[:32] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{cost_price:>12}"
+                f"{retail_price:>12}"
+                f"{margin_dollars:>18}"
+                f"{margin_percent:>18}"
+            )
+
+    else:
+        print("No Financial History Records Found.")
+
+# Function to Show Top 300 by Profit
+def show_top_300_by_profit(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            SalesHistory.UnitsSold,
+            ProductFinancial.MarginDollars,
+            SalesHistory.UnitsSold * ProductFinancial.MarginDollars AS TotalProfit,
+            SalesHistory.PeriodStartDate,
+            SalesHistory.PeriodEndDate
+        FROM
+            Product
+        JOIN SalesHistory
+            ON SalesHistory.ProductId = Product.ProductId
+        JOIN ProductFinancial
+            ON ProductFinancial.ProductId = Product.ProductId
+         WHERE SalesHistory.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'SalesHistory'
+        )
+        AND ProductFinancial.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        ORDER BY TotalProfit DESC
+        LIMIT 20
+        ;
+    """)
+
+    results = cursor.fetchall()
+
+    #print("\nTop 300 Products by Profit Dollars")
+
+    if results:
+        first_row = results[0]
+        period_start_date = first_row[5]
+        period_end_date = first_row[6]
+        formatted_start_date = datetime.fromisoformat(period_start_date).strftime("%B %d")
+        formatted_end_date = datetime.fromisoformat(period_end_date).strftime("%d, %Y")
+
+        print(f"Top 300 by Profit for the week of: {formatted_start_date} - {formatted_end_date}")
+        print()
+
+        print(
+            f"{'SKU':<10}"
+            f"{'Product Name':<40}"
+            f"{'Units Sold':>12}"
+            f"{'Margin Dollars':>18}"
+            f"{'Total Profit':>18}"
+
+        )
+        print("-" * 98)
+
+        for row in results:
+            sku, product_name, units_sold, margin_dollars, total_profit, period_start_date, period_end_date = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+            units_sold = "No Units Sold" if units_sold is None else units_sold
+            margin_dollars = "N/A" if margin_dollars is None else f"$ {margin_dollars:.2f}"
+            total_profit = "N/A" if total_profit is None else f"$ {total_profit:.2f}"
+
+            if len(product_name) > 35:
+                product_name = product_name[:32] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{units_sold:>12}"
+                f"{margin_dollars:>18}"
+                f"{total_profit:>18}"
+            )
+
+    else:
+        print("No Financial History Records Found.")
+
+
 # Main Function
 def main():
     
     connection = create_connection()
 
+    # Query Foundation and Sanity Checks
     #show_tables(connection)
-    #show_import_batch_count(connection)
+    show_import_batch_count(connection)
     #show_latest_import_batch_id(connection)
     #show_product_count(connection)
+
+    # Import Quality and Data Validation Queries
     #show_duplicate_skus(connection)
     #show_products_without_sales_history(connection)
     #show_products_without_sku(connection)
@@ -784,12 +1122,23 @@ def main():
     #show_products_in_pos(connection)
     #show_latest_inventory_batch_summary(connection)
     #show_latest_sales_batch_summary(connection)
+
+    # Inventory and Stock Health Reports
     #show_weeks_on_hand_report(connection)
     #show_low_weeks_on_hand(connection)
-    show_inventory_exceptions(connection)
+    #show_inventory_exceptions(connection)
+    #show_zero_stock_negative_sales(connection)
+    #show_active_stocked_skus(connection)
+
+    # Sales History Reports
     #show_product_quantity(connection)
     #show_latest_inventory_snapshot(connection)
     #get_sales_history(connection)
+    #get_latest_sales_history(connection)
+
+    # Financial Performance Reports
+    #show_latest_product_financials(connection)
+    #show_top_300_by_profit(connection)
 
     connection.close()
 
