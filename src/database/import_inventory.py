@@ -21,8 +21,10 @@ from datetime import datetime
 root_path = Path(__file__).resolve().parents[2]
 
 # Establishes the location for the excel file
-inventory_file = root_path / "data" / "demo" / "Mock-Inventory.xlsx"
-
+inventory_files = [
+    root_path / "data" / "demo" / "Inventory1.xlsx",
+    root_path / "data" / "demo" / "Inventory2.xlsx"
+]
 # Establishes the location for database file
 database_file = root_path / "database" / "inventory.db"
 
@@ -294,59 +296,72 @@ def show_product_financials_count(connection):
 
 
 def main():
-    
-    inventory_data = inspect_inventory_file(inventory_file)
-
-    cleaned_inventory_data = clean_inventory_data(inventory_data)
-
-    #print("\nCleaned inventory data:")
-    #print(cleaned_inventory_data.head())
-
-    duplicate_skus = cleaned_inventory_data[
-        cleaned_inventory_data.duplicated(subset=["item_no"], keep=False)
-    ]
-
-    if duplicate_skus.empty:
-        print("\nDuplicate SKUs found: None")
-    else:
-        print("\nDuplicate SKUs found:")
-        print(duplicate_skus)
-
     connection = create_connection()
 
-    import_batch_id = create_import_batch(
-        connection,
-        inventory_file.name,
-        "Inventory"
-    )
+    try:
+        for inventory_file in inventory_files:
+            print("\n" + "=" * 80)
+            print(f"Starting import for: {inventory_file.name}")
+            print("=" * 80)
 
-    products_inserted = insert_products(connection, cleaned_inventory_data)
+            inventory_data = inspect_inventory_file(inventory_file)
 
-    snapshots_inserted = insert_inventory_snapshots(
-        connection,
-        cleaned_inventory_data,
-        import_batch_id
-    )
+            cleaned_inventory_data = clean_inventory_data(inventory_data)
 
-    financials_inserted = insert_product_financials(
-        connection,
-        cleaned_inventory_data,
-        import_batch_id
-    )
+            duplicate_skus = cleaned_inventory_data[
+                cleaned_inventory_data.duplicated(subset=["item_no"], keep=False)
+            ]
 
-    connection.commit()
+            if duplicate_skus.empty:
+                print("\nDuplicate SKUs found: None")
+            else:
+                print("\nDuplicate SKUs found:")
+                print(duplicate_skus)
 
-    print(f"\nImport batch created successfully with ID: {import_batch_id}")
-    print(f"Products inserted successfully: {products_inserted}")
-    print(f"Inventory snapshots inserted successfully: {snapshots_inserted}")
-    print(f"Product financial records inserted successfully: {financials_inserted}")
+            import_batch_id = create_import_batch(
+                connection,
+                inventory_file.name,
+                "Inventory"
+            )
 
-    show_product_count(connection)
-    # test_product_lookup(connection)
-    show_import_batch_count(connection)
-    show_inventory_snapshots_count(connection)
-    show_product_financials_count(connection)
-    connection.close()
+            products_inserted = insert_products(connection, cleaned_inventory_data)
+
+            snapshots_inserted = insert_inventory_snapshots(
+                connection,
+                cleaned_inventory_data,
+                import_batch_id
+            )
+
+            financials_inserted = insert_product_financials(
+                connection,
+                cleaned_inventory_data,
+                import_batch_id
+            )
+
+            connection.commit()
+
+            print(f"\nImport completed for: {inventory_file.name}")
+            print(f"Import batch created successfully with ID: {import_batch_id}")
+            print(f"Products inserted/updated successfully: {products_inserted}")
+            print(f"Inventory snapshots inserted successfully: {snapshots_inserted}")
+            print(f"Product financial records inserted successfully: {financials_inserted}")
+
+        print("\n" + "=" * 80)
+        print("Final Database Counts")
+        print("=" * 80)
+
+        show_product_count(connection)
+        show_import_batch_count(connection)
+        show_inventory_snapshots_count(connection)
+        show_product_financials_count(connection)
+
+    except Exception as error:
+        connection.rollback()
+        print(f"\nInventory import failed: {error}")
+        raise
+
+    finally:
+        connection.close()
 
 if __name__ == "__main__":
     main()
