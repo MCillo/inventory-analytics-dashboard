@@ -26,7 +26,7 @@ def create_connection():
     try:
         connection = sqlite3.connect(database_file)
         connection.execute("PRAGMA foreign_keys = ON;")
-        print("\nConnection Succesful")
+        #print("\nConnection Succesful")
         return connection
 
     except sqlite3.Error as error:
@@ -1066,18 +1066,18 @@ def show_top_300_by_profit(connection):
         formatted_start_date = datetime.fromisoformat(period_start_date).strftime("%B %d")
         formatted_end_date = datetime.fromisoformat(period_end_date).strftime("%d, %Y")
 
-        print(f"Top 300 by Profit for the week of: {formatted_start_date} - {formatted_end_date}")
+        print(f"\nTop 300 by Profit for the week of: {formatted_start_date} - {formatted_end_date}")
         print()
 
         print(
             f"{'SKU':<10}"
             f"{'Product Name':<40}"
             f"{'Units Sold':>12}"
-            f"{'Margin Dollars':>18}"
-            f"{'Total Profit':>18}"
+            f"{'Margin Dollars Per Unit':>25}"
+            f"{'Total Profit':>20}"
 
         )
-        print("-" * 98)
+        print("-" * 107)
 
         for row in results:
             sku, product_name, units_sold, margin_dollars, total_profit, period_start_date, period_end_date = row
@@ -1095,12 +1095,249 @@ def show_top_300_by_profit(connection):
                 f"{sku:<10}"
                 f"{product_name:<40}"
                 f"{units_sold:>12}"
-                f"{margin_dollars:>18}"
-                f"{total_profit:>18}"
+                f"{margin_dollars:>25}"
+                f"{total_profit:>20}"
             )
 
     else:
         print("No Financial History Records Found.")
+
+# Function to Show Top 300 by Units Sold
+def show_top_300_by_units(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+            SalesHistory.UnitsSold,
+            SalesHistory.PeriodStartDate,
+            SalesHistory.PeriodEndDate
+        FROM
+            Product
+        JOIN SalesHistory
+            ON SalesHistory.ProductId = Product.ProductId
+        JOIN ProductFinancial
+            ON ProductFinancial.ProductId = Product.ProductId
+         WHERE SalesHistory.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'SalesHistory'
+        )
+        AND ProductFinancial.ImportBatchId = (
+            SELECT MAX(ImportBatchId)
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        )
+        ORDER BY UnitsSold DESC
+        LIMIT 20
+        ;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nTop 300 Products by Units")
+
+    if results:
+        first_row = results[0]
+        period_start_date = first_row[3]
+        period_end_date = first_row[4]
+        formatted_start_date = datetime.fromisoformat(period_start_date).strftime("%B %d")
+        formatted_end_date = datetime.fromisoformat(period_end_date).strftime("%d, %Y")
+
+        print(f"Top 300 by Units Sold for the week of: {formatted_start_date} - {formatted_end_date}")
+        print()
+
+        print(
+            f"{'SKU':<10}"
+            f"{'Product Name':<40}"
+            f"{'Units Sold':>12}"
+
+        )
+        print("-" * 62)
+
+        for row in results:
+            sku, product_name, units_sold, period_start_date, period_end_date = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+            units_sold = "No Units Sold" if units_sold is None else units_sold
+
+            if len(product_name) > 35:
+                product_name = product_name[:32] + "..."
+
+            print(
+                f"{sku:<10}"
+                f"{product_name:<40}"
+                f"{units_sold:>12}"
+            )
+
+    else:
+        print("No Financial History Records Found.")
+
+# Function to Show Low Margin Items
+def show_low_margin_items(connection):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            Product.Sku,
+            Product.ProductName,
+            ProductFinancial.MarginPercent
+        FROM
+            Product
+        JOIN ProductFinancial 
+            ON Product.ProductId = ProductFinancial.ProductId
+        ORDER BY MarginPercent ASC
+        LIMIT 30
+        ;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nLow Margin Items")
+    print()
+    print(
+        f"{'SKU':<10}"
+        f"{'Product Name':<45}"
+        f"{'Margin Percent':>15}"
+    )
+
+    print("-" * 70)
+
+    for row in results:
+        sku, product_name, margin_percent = row
+
+        sku = "No SKU" if sku is None else str(sku)
+        product_name = "No Product Name" if product_name is None else product_name
+        margin_percent = "N/A" if margin_percent is None else f"{margin_percent:.2f} %"
+
+        if len(product_name) > 35:
+            product_name = product_name[:32] + "..."
+
+        print(
+            f"{sku:<10}"
+            f"{product_name:<45}"
+            f"{margin_percent:>15}"
+        )
+
+
+# Function to Show Price or Cost Changes
+def show_price_changes(connection):
+    cursor = connection.cursor()
+    
+    cursor.execute("""
+        WITH LatestInventoryBatch AS (
+            SELECT MAX(ImportBatchId) AS LatestBatchId
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+        ),
+
+        PreviousInventoryBatch AS (
+            SELECT MAX(ImportBatchId) AS PreviousBatchId
+            FROM ImportBatch
+            WHERE ImportType = 'Inventory'
+              AND ImportBatchId < (
+                  SELECT LatestBatchId
+                  FROM LatestInventoryBatch
+              )
+        )
+
+        SELECT
+            Product.SKU,
+            Product.ProductName,
+
+            ROUND(PreviousFinancial.CostPrice, 2) AS PreviousCost,
+            ROUND(LatestFinancial.CostPrice, 2) AS LatestCost,
+            ROUND(LatestFinancial.CostPrice - PreviousFinancial.CostPrice, 2) AS CostChange,
+
+            ROUND(PreviousFinancial.RetailPrice, 2) AS PreviousRetail,
+            ROUND(LatestFinancial.RetailPrice, 2) AS LatestRetail,
+            ROUND(LatestFinancial.RetailPrice - PreviousFinancial.RetailPrice, 2) AS RetailChange,
+
+            ROUND(PreviousFinancial.MarginPercent, 2) AS PreviousMarginPercent,
+            ROUND(LatestFinancial.MarginPercent, 2) AS LatestMarginPercent,
+            ROUND(LatestFinancial.MarginPercent - PreviousFinancial.MarginPercent, 2) AS MarginPercentChange
+
+        FROM Product
+
+        JOIN ProductFinancial AS LatestFinancial
+            ON Product.ProductId = LatestFinancial.ProductId
+
+        JOIN ProductFinancial AS PreviousFinancial
+            ON Product.ProductId = PreviousFinancial.ProductId
+
+        WHERE LatestFinancial.ImportBatchId = (
+            SELECT LatestBatchId
+            FROM LatestInventoryBatch
+        )
+        AND PreviousFinancial.ImportBatchId = (
+            SELECT PreviousBatchId
+            FROM PreviousInventoryBatch
+        )
+        AND (
+            LatestFinancial.CostPrice != PreviousFinancial.CostPrice
+            OR LatestFinancial.RetailPrice != PreviousFinancial.RetailPrice
+            OR LatestFinancial.MarginPercent != PreviousFinancial.MarginPercent
+            OR LatestFinancial.MarginDollars != PreviousFinancial.MarginDollars
+        )
+
+        ORDER BY ABS(CostChange) DESC
+        LIMIT 20;
+    """)
+
+    results = cursor.fetchall()
+
+    if results:
+        print("\nPrice or Cost Changes:")
+        print(
+            f"{'SKU':<10} "
+            f"{'ProductName':<35} "
+            f"{'Old Cost':>10} "
+            f"{'New Cost':>10} "
+            f"{'Cost +/-':>10} "
+            f"{'Old Retail':>12} "
+            f"{'New Retail':>12} "
+            f"{'Retail +/-':>12} "
+            f"{'Margin +/-':>12}"
+        )
+        print("-" * 135)
+
+        for row in results:
+            (
+                sku,
+                product_name,
+                previous_cost,
+                latest_cost,
+                cost_change,
+                previous_retail,
+                latest_retail,
+                retail_change,
+                previous_margin_percent,
+                latest_margin_percent,
+                margin_percent_change
+            ) = row
+
+            sku = "No SKU" if sku is None else str(sku)
+            product_name = "No Product Name" if product_name is None else product_name
+
+            if len(product_name) > 35:
+                product_name = product_name[:32] + "..."
+
+            print(
+                f"{sku:<10} "
+                f"{product_name:<35} "
+                f"{previous_cost:>10.2f} "
+                f"{latest_cost:>10.2f} "
+                f"{cost_change:>10.2f} "
+                f"{previous_retail:>12.2f} "
+                f"{latest_retail:>12.2f} "
+                f"{retail_change:>12.2f} "
+                f"{margin_percent_change:>12.2f}"
+            )
+
+    else:
+        print("\nNo price or cost changes found.")
 
 
 # Main Function
@@ -1110,7 +1347,7 @@ def main():
 
     # Query Foundation and Sanity Checks
     #show_tables(connection)
-    show_import_batch_count(connection)
+    #show_import_batch_count(connection)
     #show_latest_import_batch_id(connection)
     #show_product_count(connection)
 
@@ -1139,6 +1376,8 @@ def main():
     # Financial Performance Reports
     #show_latest_product_financials(connection)
     #show_top_300_by_profit(connection)
+    #show_top_300_by_units(connection)
+    show_low_margin_items(connection)
 
     connection.close()
 
