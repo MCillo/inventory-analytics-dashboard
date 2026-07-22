@@ -60,6 +60,7 @@ def create_tables(connection):
             CREATE TABLE IF NOT EXISTS ImportBatch (
                 ImportBatchId INTEGER PRIMARY KEY AUTOINCREMENT,
                 ImportDate DATETIME NOT NULL,
+                ReportDate DATETIME NOT NULL,
                 FileName TEXT NOT NULL,
                 ImportType TEXT NOT NULL,
                 Status TEXT NOT NULL
