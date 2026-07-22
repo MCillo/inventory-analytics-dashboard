@@ -56,26 +56,59 @@ def show_import_batch_count(connection):
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT 
-            COUNT(*),
-            ImportType,
-            Status    
-        FROM ImportBatch
+        SELECT COUNT(*)
+        FROM ImportBatch;
     """)
 
-    results = cursor.fetchall()
+    import_batch_count = cursor.fetchone()[0]
 
-    if results:
-        print("\nBatch Count")
-        print(f"{'COUNT':<15} {'ImportType':<20} {'Status':<20}")
-        print("-" * 55)
+    print("\nBatch Count")
+    print("-" * 20)
+    print(f"Total Import Batches: {import_batch_count}")
 
-        for row in results:
-            count, import_type, status = row
-            print({f"{count:<15} {import_type:<20} {status:<20}"})
+    cursor.execute("""
+        SELECT
+            ImportBatchId,
+            ImportDate,
+            ReportDate,
+            FileName,
+            ImportType,
+            Status
+        FROM ImportBatch
+        ORDER BY ImportBatchId DESC
+        LIMIT 10;
+    """)
 
-    else:
-        print("\nNo Import Batches Found.")
+    recent_batches = cursor.fetchall()
+
+    print("\nRecent Import History")
+    print(
+        f"{'Batch ID':<10}"
+        f"{'Import Type':<16}"
+        f"{'Report Date':<20}"
+        f"{'Status':<12}"
+        f"{'File Name'}"
+    )
+
+    print("-" * 80)
+
+    for batch in recent_batches:
+        (
+            import_batch_id,
+            import_date,
+            report_date,
+            file_name,
+            import_type,
+            status
+        ) = batch
+
+        print(
+            f"{import_batch_id:<10}"
+            f"{import_type:<16}"
+            f"{report_date:<20}"
+            f"{status:<12}"
+            f"{file_name}"
+        )
 
 # Function to show the latest Import Batch Id
 def show_latest_import_batch_id(connection):
@@ -94,7 +127,11 @@ def show_latest_import_batch_id(connection):
     results = cursor.fetchone()
 
     print("\nLatest Import Batch")
-    print(results)
+    import_batch_id, import_type, status = results
+    print(f"{'Import Batch Id':<20} {'Import Type':<25} {'Status':<15}")
+    print("-" * 60)
+    print(f"{import_batch_id:<20} {import_type:<25} {status:<15}")
+    #print(results)
 
 # Function to show Product Count
 def show_product_count(connection):
@@ -108,7 +145,8 @@ def show_product_count(connection):
     results = cursor.fetchone()
     product_count = results[0]
     print("\nTotal Number of Products:")
-    print(product_count)
+    print("-" * 25)
+    print(f"{product_count:>15}")
 
 # Function to show duplicate SKU's
 def show_duplicate_skus(connection):
@@ -201,7 +239,7 @@ def show_products_without_sku(connection):
         print("-" * 50)
 
         for row in results:
-            print("f{row:<45}")
+            print(f"{row:<45}")
     else:
         print("\nAll Products Have a Matching SKU")
 
@@ -232,32 +270,6 @@ def show_products_not_in_pos(connection):
     else:
         print("\nAll Products are in POS.")
 
-# Function to show products listed as In POS
-def show_products_in_pos(connection):
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        SELECT
-            SKU,
-            ProductName,
-            IsInPOS
-        FROM
-            Product
-        WHERE 
-            IsInPOS = '1'
-    """)
-
-    results = cursor.fetchall()
-
-    if results:
-        print("\nProducts in POS:")
-        print(f"{'ProductName':<45}")
-        print("-" * 50)
-
-        for row in results:
-            print(f"{row:<45}")
-    else:
-        print("\nAll Products are in POS.")
 
 # Function to show latest Inventory Batch Summary
 def show_latest_inventory_batch_summary(connection):
@@ -267,6 +279,7 @@ def show_latest_inventory_batch_summary(connection):
         SELECT
             ImportBatch.ImportBatchId,
             ImportBatch.ImportDate,
+            ImportBatch.ReportDate,
             ImportBatch.FileName,
             ImportBatch.Status,
 
@@ -318,6 +331,7 @@ def show_latest_inventory_batch_summary(connection):
         (
             import_batch_id,
             import_date,
+            report_date,
             file_name,
             status,
             snapshot_row_count,
@@ -333,10 +347,15 @@ def show_latest_inventory_batch_summary(connection):
         else:
             formatted_import_date = "No Import Date"
 
+        if report_date is not None:
+            formatted_report_date = datetime.fromisoformat(report_date).strftime("%d/%m/%Y %H:%M")
+        else:
+            formatted_report_date = "No Report Date"
+
         print("\nLatest Inventory Batch Summary:")
         print(f"Batch ID: {import_batch_id}")
         print(f"Import Date: {formatted_import_date}")
-        print(f"Import Date: {import_date}")
+        print(f"Report Date: {formatted_report_date}")
         print(f"File Name: {file_name}")
         print(f"Status: {status}")
         print()
@@ -472,9 +491,25 @@ def show_product_quantity(connection):
     """)
 
     results = cursor.fetchall()
+    snapshot_date = results[0][3]
 
     print("\nProduct Quantities:")
-    print(results)
+    print(f"Snapshot Date: {snapshot_date}")
+    print(f"{'SKU':<10} {'Product Name':<35} {'Quantity on Hand':<15}")
+    print("-" * 75)
+
+    for row in results:
+        sku, product_name, quantity_on_hand, snapshot_date = row
+
+        sku = "No SKU" if sku is None else str(sku)
+        product_name = "No Product Name" if product_name is None else product_name
+        quantity_on_hand = "No Quantity on Hand" if quantity_on_hand is None else str(quantity_on_hand)
+
+        if len(product_name) > 35:
+            product_name = product_name[:32] + "..."
+
+        print(f"{sku:<10} {product_name:<35} {quantity_on_hand:>15}")
+    
 
 # Function to show latest inventory snapshot
 def show_latest_inventory_snapshot(connection):
@@ -637,7 +672,7 @@ def show_low_weeks_on_hand(connetion):
 
     results = cursor.fetchall()
 
-    print("\nWeeks On Hand Report:")
+    print("\nLow Weeks On Hand Report:")
     print(
         f"{'SKU':<10} "
         f"{'ProductName':<40} "
@@ -872,6 +907,9 @@ def get_sales_history(connection):
 
     for row in results:
         sku, product_name, qty_on_hand, units_sold, estimated_woh = row
+
+        if len(product_name) > 35:
+            product_name = product_name[:32] + "..."
 
         print(f"{sku:<10} {product_name:<35} {qty_on_hand:>10} {units_sold:>10} {estimated_woh:>10}")
 
@@ -1346,21 +1384,24 @@ def main():
     connection = create_connection()
 
     # Query Foundation and Sanity Checks
+    
     #show_tables(connection)
     #show_import_batch_count(connection)
     #show_latest_import_batch_id(connection)
     #show_product_count(connection)
 
     # Import Quality and Data Validation Queries
+    
     #show_duplicate_skus(connection)
     #show_products_without_sales_history(connection)
     #show_products_without_sku(connection)
     #show_products_not_in_pos(connection)
-    #show_products_in_pos(connection)
     #show_latest_inventory_batch_summary(connection)
     #show_latest_sales_batch_summary(connection)
 
     # Inventory and Stock Health Reports
+
+    #show_latest_inventory_snapshot(connection)
     #show_weeks_on_hand_report(connection)
     #show_low_weeks_on_hand(connection)
     #show_inventory_exceptions(connection)
@@ -1368,12 +1409,13 @@ def main():
     #show_active_stocked_skus(connection)
 
     # Sales History Reports
+    
     #show_product_quantity(connection)
-    #show_latest_inventory_snapshot(connection)
-    #get_sales_history(connection)
+    #get_sales_history(connection) #same as get_latest_sales_history but includes QTY on Hand and EstWOH
     #get_latest_sales_history(connection)
 
     # Financial Performance Reports
+    
     #show_latest_product_financials(connection)
     #show_top_300_by_profit(connection)
     #show_top_300_by_units(connection)
