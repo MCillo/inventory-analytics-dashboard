@@ -14,8 +14,15 @@ import re
 
 # Establish root path for file tree
 root_path = Path(__file__).resolve().parents[2]
-# Establish location of Spreadsheet
-sales_file = root_path / "data" / "demo" / "Mock-Sales.xlsx"
+# Establish location for the files to import
+sales_files = [
+    root_path / "data" / "demo" / "sales_reports" / "SalesByItem1.xls",
+    root_path / "data" / "demo" / "sales_reports" / "SalesByItem2.xls",
+    root_path / "data" / "demo" / "sales_reports" / "SalesByItem3.xls",
+    root_path / "data" / "demo" / "sales_reports" / "SalesByItem4.xls",
+]
+#sales_file = root_path / "data" / "demo" / "sales_reports" / "SalesByItem1.xls"
+
 # Establish location of database
 database_file = root_path / "database" / "inventory.db"
 
@@ -23,7 +30,7 @@ database_file = root_path / "database" / "inventory.db"
 def inspect_sales_file(file_path):
     try:
         # Read data from spreadsheet and use Excel row 4 as column headers
-        sales_data = pd.read_excel(file_path, header=3)
+        sales_data = pd.read_excel(file_path, header=3, engine="xlrd")
 
         print(f"Sales file loaded successfully: {file_path.name}")
 
@@ -50,6 +57,7 @@ def inspect_sales_file(file_path):
 
     except FileNotFoundError:
         print(f"File not found: {file_path}")
+        raise
 
     except Exception as error:
         print(f"Error reading sales file: {error}")
@@ -58,7 +66,7 @@ def inspect_sales_file(file_path):
 # Function to get the sales history start and end date from the spreadsheet
 def get_sales_period(file_path):
     # Read the spreadsheet without treating any row as headers
-    raw_data = pd.read_excel(file_path, header=None)
+    raw_data = pd.read_excel(file_path, header=None, engine="xlrd")
 
     # Cell B3 = row index 2, column index 1
     valuation_text = str(raw_data.iloc[2, 1])
@@ -109,19 +117,21 @@ def create_connection():
         raise
 
 # Function to create an Import Batch
-def create_import_batch(connection, file_name, import_type):
+def create_import_batch(connection, file_name, import_type, report_date):
     cursor = connection.cursor()
 
     cursor.execute("""
         INSERT INTO ImportBatch (
             ImportDate,
+            ReportDate,
             FileName,
             ImportType,
             Status
         )
-        VALUES (?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?);
     """, (
         datetime.now().isoformat(),
+        report_date,
         file_name,
         import_type,
         "Success"
@@ -212,57 +222,90 @@ def show_sales_history_count(connection):
     print(f"Total sales history records in database: {sales_history_count}")
 
 def main():
-    sales_data = inspect_sales_file(sales_file)
-
-    cleaned_sales_data = clean_sales_data(sales_data)
-
-    returns = cleaned_sales_data[cleaned_sales_data["qty_sold"] < 0]
-
-    if returns.empty:
-        print("\nReturned items found: None")
-    else:
-        print("\nReturned items found:")
-        print(returns)
-
-    duplicate_skus = cleaned_sales_data[
-        cleaned_sales_data.duplicated(subset=["item_no"], keep=False)
-    ]
-
-    if duplicate_skus.empty:
-        print("\nDuplicate SKUs found: None")
-    else:
-        print("\nDuplicate SKUs found:")
-        print(duplicate_skus)
-
     connection = create_connection()
 
-    import_batch_id = create_import_batch(
-        connection,
-        sales_file.name,
-        "SalesHistory"
-    )
+    try:
+        for sales_file in sales_files:
+            print("\n" + "=" * 80)
+            print(f"Starting import for: {sales_file.name}")
+            print("=" * 80)
 
-    period_start_date, period_end_date = get_sales_period(sales_file)
+            sales_data = inspect_sales_file(sales_file)
 
-    print(f"Sales period start: {period_start_date}")
-    print(f"Sales period end: {period_end_date}")
+            cleaned_sales_data = clean_sales_data(sales_data)
 
-    sales_inserted = insert_sales_history(
-        connection,
-        cleaned_sales_data,
-        import_batch_id,
-        period_start_date,
-        period_end_date
-    )
+            returns = cleaned_sales_data[
+                cleaned_sales_data["qty_sold"] < 0
+            ]
 
-    connection.commit()
+            if returns.empty:
+                print("\nReturned items found: None")
+            else:
+                print("\nReturned items found:")
+                print(returns)
 
-    print(f"\nImport Batch created successfully with ID: {import_batch_id}")
-    print(f"Sales history records inserted: {sales_inserted}")
+            duplicate_skus = cleaned_sales_data[
+                cleaned_sales_data.duplicated(
+                    subset=["item_no"],
+                    keep=False
+                )
+            ]
 
-    show_import_batch_count(connection)
-    show_sales_history_count(connection)
-    connection.close()
+            if duplicate_skus.empty:
+                print("\nDuplicate SKUs found: None")
+            else:
+                print("\nDuplicate SKUs found:")
+                print(duplicate_skus)
+
+            # Get this file's sales period
+            period_start_date, period_end_date = get_sales_period(
+                sales_file
+            )
+
+            print(f"Sales period start: {period_start_date}")
+            print(f"Sales period end: {period_end_date}")
+
+            # Create a separate import batch for this file
+            import_batch_id = create_import_batch(
+                connection,
+                sales_file.name,
+                "SalesHistory",
+                period_end_date
+            )
+
+            sales_inserted = insert_sales_history(
+                connection,
+                cleaned_sales_data,
+                import_batch_id,
+                period_start_date,
+                period_end_date
+            )
+
+            connection.commit()
+
+            print(f"\nImport completed for: {sales_file.name}")
+            print(
+                f"Import Batch created successfully with ID: "
+                f"{import_batch_id}"
+            )
+            print(
+                f"Sales history records inserted: {sales_inserted}"
+            )
+
+        print("\n" + "=" * 80)
+        print("Final Database Counts")
+        print("=" * 80)
+
+        show_import_batch_count(connection)
+        show_sales_history_count(connection)
+
+    except Exception as error:
+        connection.rollback()
+        print(f"\nSales import failed: {error}")
+        raise
+
+    finally:
+        connection.close()
 
 if __name__ == "__main__":
     main()
