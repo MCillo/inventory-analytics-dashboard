@@ -115,10 +115,11 @@ Table OrderScenarioItem {
 Table ImportBatch {
     ImportBatchId int [pk, increment, not null]
     ImportDate datetime // The date and time when the import was performed
+    ReportDate datetime // The Date the import file was created
     FileName varchar(255)
     ImportType varchar(50)
     Status varchar(50)
-
+    
 }
 
 Table Role {
