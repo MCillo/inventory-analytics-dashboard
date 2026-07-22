@@ -20,10 +20,12 @@ from datetime import datetime
 # Establishes the root path for the file tree
 root_path = Path(__file__).resolve().parents[2]
 
-# Establishes the location for the excel file
+# Establishes the location for the files to import
 inventory_files = [
-    root_path / "data" / "demo" / "Inventory1.xlsx",
-    root_path / "data" / "demo" / "Inventory2.xlsx"
+    root_path / "data" / "demo" / "inventory_reports" / "Inventory1.xlsx",
+    root_path / "data" / "demo" / "inventory_reports" / "Inventory2.xlsx",
+    root_path / "data" / "demo" / "inventory_reports" / "Inventory3.xlsx",
+    root_path / "data" / "demo" / "inventory_reports" / "Inventory4.xlsx"
 ]
 # Establishes the location for database file
 database_file = root_path / "database" / "inventory.db"
@@ -31,14 +33,27 @@ database_file = root_path / "database" / "inventory.db"
 # Function to read spreadsheet file 
 def inspect_inventory_file(file_path):
     try:
-
         print(f"Reading inventory file from: {file_path}")
 
-        # Read data from Spreadsheet and use second row as column headers
-        inventory_data = pd.read_excel(file_path, header=1)
+        # Read the report date from cell B1
+        report_date_data = pd.read_excel(
+            file_path,
+            header=None,
+            nrows=1
+        )
+
+        report_date = report_date_data.iloc[0, 1]
+        report_date = pd.to_datetime(report_date).isoformat()
+
+        # Read inventory data using row 2 as the column headers
+        inventory_data = pd.read_excel(
+            file_path,
+            header=1
+        )
 
         print(f"Inventory file loaded successfully: {file_path.name}")
-        # Rename the spreadsheet column names to Python friendly names
+        print(f"Report date: {report_date}")
+
         inventory_data = inventory_data.rename(columns={
             "Item No.": "item_no",
             "Description": "description",
@@ -49,16 +64,7 @@ def inspect_inventory_file(file_path):
             "Gross M %": "gross_margin_percent"
         })
 
-        """
-        print("\nCleaned columns:")
-        for column in inventory_data.columns:
-            print(f"- {column}")
-
-        print("\nFirst 5 rows:")
-        print(inventory_data.head())
-        """
-
-        return inventory_data
+        return inventory_data, report_date
 
     except FileNotFoundError:
         print(f"File not found: {file_path}")
@@ -99,19 +105,21 @@ def create_connection():
         print(f"Database connection error: {error}")
         raise
 
-def create_import_batch(connection, file_name, import_type):
+def create_import_batch(connection, file_name, import_type, report_date):
     cursor = connection.cursor()
 
     cursor.execute("""
         INSERT INTO ImportBatch (
             ImportDate,
+            ReportDate,
             FileName,
             ImportType,
             Status
         )
-        VALUES (?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?);
     """, (
         datetime.now().isoformat(),
+        report_date,
         file_name,
         import_type,
         "Success"
@@ -196,7 +204,7 @@ def test_product_lookup(connection):
     print(f"Product ID for SKU 216750: {product_id}")
 """
 
-def insert_inventory_snapshots(connection, inventory_data, import_batch_id):
+def insert_inventory_snapshots(connection, inventory_data, import_batch_id, report_date):
     cursor = connection.cursor()
 
     snapshots_inserted = 0
@@ -218,7 +226,7 @@ def insert_inventory_snapshots(connection, inventory_data, import_batch_id):
                 VALUES (?, ?, ?, ?);
             """, (
                 int(quantity_on_hand),
-                datetime.now().isoformat(),
+                report_date,
                 import_batch_id,
                 product_id
             ))
@@ -242,7 +250,7 @@ def show_inventory_snapshots_count(connection):
 
     print(f"Total Inventory Snapshots in database: {inventory_snapshots_count}")
 
-def insert_product_financials(connection, inventory_data, import_batch_id):
+def insert_product_financials(connection, inventory_data, import_batch_id, report_date):
 
     cursor = connection.cursor()
 
@@ -266,7 +274,7 @@ def insert_product_financials(connection, inventory_data, import_batch_id):
                 )
                 VALUES (?,?,?,?,?,?,?);
             """, (
-                datetime.now().isoformat(),
+                report_date,
                 product_id,
                 import_batch_id,
                 row.base_price,
@@ -304,7 +312,7 @@ def main():
             print(f"Starting import for: {inventory_file.name}")
             print("=" * 80)
 
-            inventory_data = inspect_inventory_file(inventory_file)
+            inventory_data, report_date = inspect_inventory_file(inventory_file)
 
             cleaned_inventory_data = clean_inventory_data(inventory_data)
 
@@ -321,7 +329,8 @@ def main():
             import_batch_id = create_import_batch(
                 connection,
                 inventory_file.name,
-                "Inventory"
+                "Inventory",
+                report_date
             )
 
             products_inserted = insert_products(connection, cleaned_inventory_data)
@@ -329,13 +338,15 @@ def main():
             snapshots_inserted = insert_inventory_snapshots(
                 connection,
                 cleaned_inventory_data,
-                import_batch_id
+                import_batch_id,
+                report_date
             )
 
             financials_inserted = insert_product_financials(
                 connection,
                 cleaned_inventory_data,
-                import_batch_id
+                import_batch_id,
+                report_date
             )
 
             connection.commit()
