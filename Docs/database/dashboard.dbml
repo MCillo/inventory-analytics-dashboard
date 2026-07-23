@@ -13,6 +13,9 @@
 // Product 1 - M OrderScenarioItem
 // Product 1 - M ProductFinancial
 // ImportBatch 1 - M ProductFinancial
+// OrderWeek 1 - M OrderScenario
+// OrderScenario 1 - M OrderScenarioDeal
+// OrderScenarioDeal 1 - M OrderScenarioItem
 
 
 // Using Sqlite3 which stores boolean values as either a
@@ -84,32 +87,52 @@ Table SalesHistory {
     ProductId int [not null, ref: > Product.ProductId]
     
 }
- 
+
+Table OrderWeek {
+  OrderWeekId int [pk, increment]
+  WeekStartDate datetime
+  BudgetAmount decimal
+  Notes varchar(255)
+
+}
+
 Table OrderScenario {
   OrderScenarioId int [pk, increment]
   ScenarioName varchar(100)
   ScenarioDate datetime
-  DealDescription varchar(150)
-  TotalDealCases int
+  ExpectedDeliveryDate datetime
   Notes varchar(255)
 
+  OrderWeekId int [ref: > OrderWeek.OrderWeekId]
   VendorId int [ref: > Vendor.VendorId]
   SalesRepId int [ref: > SalesRep.SalesRepId]
-  UserId int [ref: > AppUser.UserId]
+  AppUserId int [ref: > AppUser.AppUserId]
+}
+
+Table OrderScenarioDeal {
+  OrderScenarioDealId int [pk, increment]
+  OrderScenarioId int [ref: > OrderScenario.OrderScenarioId]
+
+  DealDescription varchar(150)
+  RequiredCases int
 }
 
 Table OrderScenarioItem {
   OrderScenarioItemId int [pk, increment]
 
-  OrderScenarioId int [ref: > OrderScenario.OrderScenarioId]
+  OrderScenarioId int [not null, ref: > OrderScenario.OrderScenarioId]
+  OrderScenarioDealId int [ref: > OrderScenarioDeal.OrderScenarioDealId]
   ProductId int [ref: > Product.ProductId]
+
+  ProposedCases int
+  ProposedBottles int
+  FreeCases int
+  FreeBottles int
+  ProposedUnitCost decimal
 
   TempProductName varchar(150)
   TempSize varchar(50)
   TempNotes varchar(255)
-
-  ProposedCases int
-  ProposedBottles int
 }
 
 Table ImportBatch {
@@ -129,17 +152,18 @@ Table Role {
 }
 
 Table AppUser {
-    UserId int [pk, increment]  
-    UserFirstName varchar(50)
-    UserLastName varchar(50)
-    UserEmail varchar(255)
+    AppUserId int [pk, increment]
+    Username varchar(100) [not null, unique]
+    FirstName varchar(50)
+    LastName varchar(50)
+    Email varchar(255) [not null, unique]
+    IsActive boolean
 
     RoleId int [not null, ref: > Role.RoleId]
 
-    PasswordHash varchar(255) // to be added in a later version when I implement authentication
-    MfaEnabled boolean // to be added in a later version when I implement authentication
-    IsActive boolean // to be added in a later version when I implement authentication
-
+    // PasswordHash varchar(255) // to be added in a later version when I implement authentication
+    // MfaEnabled boolean // to be added in a later version when I implement authentication
+    
 }
 
 
