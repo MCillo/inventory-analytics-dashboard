@@ -539,7 +539,7 @@ def show_latest_inventory_snapshot(connection):
             FROM ImportBatch
             WHERE ImportType = 'Inventory'
         )
-        LIMIT 10;            
+        LIMIT 100;            
     """)
 
     results = cursor.fetchall()
@@ -1401,7 +1401,7 @@ def main():
 
     # Inventory and Stock Health Reports
 
-    #show_latest_inventory_snapshot(connection)
+    show_latest_inventory_snapshot(connection)
     #show_weeks_on_hand_report(connection)
     #show_low_weeks_on_hand(connection)
     #show_inventory_exceptions(connection)
@@ -1420,7 +1420,7 @@ def main():
     #show_top_300_by_profit(connection)
     #show_top_300_by_units(connection)
     #show_low_margin_items(connection)
-    show_price_cost_changes(connection)
+    #show_price_cost_changes(connection)
 
     connection.close()
 
