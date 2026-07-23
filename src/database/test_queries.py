@@ -1261,7 +1261,7 @@ def show_low_margin_items(connection):
 
 
 # Function to Show Price or Cost Changes
-def show_price_changes(connection):
+def show_price_cost_changes(connection):
     cursor = connection.cursor()
     
     cursor.execute("""
@@ -1419,7 +1419,8 @@ def main():
     #show_latest_product_financials(connection)
     #show_top_300_by_profit(connection)
     #show_top_300_by_units(connection)
-    show_low_margin_items(connection)
+    #show_low_margin_items(connection)
+    show_price_cost_changes(connection)
 
     connection.close()
 
