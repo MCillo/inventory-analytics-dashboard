@@ -96,6 +96,8 @@ def create_tables(connection):
             create table if not exists AppUser (
                 AppUserId INTEGER PRIMARY KEY AUTOINCREMENT,
                 Username TEXT NOT NULL UNIQUE,
+                FirstName VARCHAR,
+                LastName VARCHAR,
                 Email TEXT NOT NULL UNIQUE,
                 RoleId INTEGER NOT NULL,
                 IsActive INTEGER DEFAULT 1,
@@ -154,34 +156,69 @@ def create_tables(connection):
         print("SalesHistory table created successfully.")   
 
         cursor.execute("""
-            create table if not exists OrderScenario (
-                OrderScenarioId INTEGER PRIMARY KEY AUTOINCREMENT,
-                ScenarioName TEXT,
-                ScenarioDate DATETIME,
-                DealDescription TEXT,
-                TotalDealCases INTEGER,
-                Notes TEXT,
-                VendorId INTEGER,
-                SalesRepId INTEGER,
-                AppUserId INTEGER,
-                FOREIGN KEY (VendorId) REFERENCES Vendor(VendorId),
-                FOREIGN KEY (SalesRepId) REFERENCES SalesRep(SalesRepId),
-                FOREIGN KEY (AppUserId) REFERENCES AppUser(AppUserId)
+            create table if not exists OrderWeek (
+            OrderWeekId INTEGER PRIMARY KEY AUTOINCREMENT,
+            WeekStartDate DATETIME,
+            BudgetAmount REAL,
+            Notes TEXT
+            );
+        """)
+        print("OrderWeek table created successfully.")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS OrderScenario (
+            OrderScenarioId INTEGER PRIMARY KEY AUTOINCREMENT,
+            ScenarioName TEXT,
+            ScenarioDate DATETIME,
+            ExpectedDeliveryDate DATETIME,
+            Notes TEXT,
+
+            OrderWeekId INTEGER,
+            VendorId INTEGER,
+            SalesRepId INTEGER,
+            AppUserId INTEGER,
+
+            FOREIGN KEY (OrderWeekId) REFERENCES OrderWeek(OrderWeekId),
+            FOREIGN KEY (VendorId) REFERENCES Vendor(VendorId),
+            FOREIGN KEY (SalesRepId) REFERENCES SalesRep(SalesRepId),
+            FOREIGN KEY (AppUserId) REFERENCES AppUser(AppUserId)
             );
         """)
         print("OrderScenario table created successfully.")
 
         cursor.execute("""
-            create table if not exists OrderScenarioItem (
-                OrderScenarioItemId INTEGER PRIMARY KEY AUTOINCREMENT,
+            create table if not exists OrderScenarioDeal (
+                OrderScenarioDealId INTEGER PRIMARY KEY AUTOINCREMENT,
                 OrderScenarioId INTEGER,
+                DealDescription VARCHAR,
+                RequiredCases INTEGER,
+                FOREIGN KEY (OrderScenarioId) REFERENCES OrderScenario(OrderScenarioId)
+            );    
+        """)
+        print("OrderScenarioDeal table created successfully.")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS OrderScenarioItem (
+                OrderScenarioItemId INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                OrderScenarioId INTEGER NOT NULL,
+                OrderScenarioDealId INTEGER,
                 ProductId INTEGER,
-                ProposedCases INTEGER,
-                ProposedBottles INTEGER,
+
+                ProposedCases INTEGER DEFAULT 0,
+                ProposedBottles INTEGER DEFAULT 0,
+                FreeCases INTEGER DEFAULT 0,
+                FreeBottles INTEGER DEFAULT 0,
+                ProposedUnitCost REAL,
+
                 TempProductName TEXT,
                 TempSize TEXT,
                 TempNotes TEXT,
+
                 FOREIGN KEY (OrderScenarioId) REFERENCES OrderScenario(OrderScenarioId),
+
+                FOREIGN KEY (OrderScenarioDealId) REFERENCES OrderScenarioDeal(OrderScenarioDealId),
+
                 FOREIGN KEY (ProductId) REFERENCES Product(ProductId)
             );
         """)
