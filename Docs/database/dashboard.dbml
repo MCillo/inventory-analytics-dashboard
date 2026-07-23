@@ -52,8 +52,8 @@ Table Product {
     ProductId int [pk, increment, not null]
     SKU int [unique]   // This would be our in house SKU that we use, it can be null for New products that haven't been added to our system yet 
     ProductName varchar(255)
-    Size varchar(50)
-    CasePack int
+    Size varchar(50) //1.75L, 750ml, 30pk
+    CasePack int // number of bottles or units per case 
     IsSeasonal boolean
     IsDiscontinued boolean
     IsInPOS boolean
@@ -119,7 +119,7 @@ Table ImportBatch {
     FileName varchar(255)
     ImportType varchar(50)
     Status varchar(50)
-    
+
 }
 
 Table Role {
