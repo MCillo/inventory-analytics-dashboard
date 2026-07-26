@@ -209,11 +209,16 @@ def create_tables(connection):
                 ProposedBottles INTEGER DEFAULT 0,
                 FreeCases INTEGER DEFAULT 0,
                 FreeBottles INTEGER DEFAULT 0,
+                
                 ProposedUnitCost REAL,
+                FreeUnitCharge REAL DEFAULT 0,
 
                 TempProductName TEXT,
                 TempSize TEXT,
+                TempCasePack INTEGER,
                 TempNotes TEXT,
+
+                DisplayOrder INTEGER DEFAULT 0,
 
                 FOREIGN KEY (OrderScenarioId) REFERENCES OrderScenario(OrderScenarioId),
 
