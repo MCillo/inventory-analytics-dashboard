@@ -128,11 +128,16 @@ Table OrderScenarioItem {
   ProposedBottles int
   FreeCases int
   FreeBottles int
+
   ProposedUnitCost decimal
+  FreeUnitCharge decimal
 
   TempProductName varchar(150)
   TempSize varchar(50)
+  TempCasePack int
   TempNotes varchar(255)
+
+  DisplayOrder int
 }
 
 Table ImportBatch {
