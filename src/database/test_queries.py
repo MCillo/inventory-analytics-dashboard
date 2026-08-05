@@ -1377,7 +1377,81 @@ def show_price_cost_changes(connection):
     else:
         print("\nNo price or cost changes found.")
 
+def show_order_scenarios(connection):
+    cursor = connection.cursor()
 
+    cursor.execute("""
+        SELECT
+            os.ScenarioName,
+            os.ScenarioDate,
+            v.VendorName,
+            TRIM(
+                COALESCE(sr.ContactFirstName, '')
+                || ' ' ||
+                COALESCE(sr.ContactLastName, '')
+            ) AS ContactName,
+            os.Notes,
+            ow.BudgetAmount AS Budget
+        FROM OrderScenario AS os
+
+        LEFT JOIN Vendor AS v
+            ON os.VendorId = v.VendorId
+
+        LEFT JOIN SalesRep AS sr
+            ON os.SalesRepId = sr.SalesRepId
+
+        LEFT JOIN OrderWeek AS ow
+            ON os.OrderWeekId = ow.OrderWeekId
+
+        ORDER BY os.OrderScenarioId DESC;
+    """)
+
+    results = cursor.fetchall()
+
+    print("\nLatest Order Scenarios:")
+
+    if results:
+        print(
+            f"{'Scenario Name':>35}"
+            f"{'Scenario Date':>18}"
+            f"{'Vendor':>30}"
+            f"{'Contact Name':>30}"
+            f"{'Notes':>40}"
+            f"{'Budget':>15}"
+        )
+        print("-" * 168)
+
+        for row in results:
+            scenario_name, scenario_date, vendor, contact_name, notes, budget = row
+
+            scenario_name = scenario_name or "No Name"
+            vendor = vendor or "No Vendor Assigned"
+            contact_name = contact_name or "No Rep Assigned"
+            notes = notes or "No Notes"
+
+            if scenario_date:
+                formatted_scenario_date = datetime.fromisoformat(
+                    scenario_date
+                ).strftime("%b %d, %Y")
+            else:
+                formatted_scenario_date = "No Date"
+
+            if budget is not None:
+                formatted_budget = f"${budget:,.2f}"
+            else:
+                formatted_budget = "No Budget"
+
+            print(
+                f"{scenario_name:>35}"
+                f"{formatted_scenario_date:>18}"
+                f"{vendor:>30}"
+                f"{contact_name:>30}"
+                f"{notes:>40}"
+                f"{formatted_budget:>15}"
+            )
+
+    else:
+        print("No Order Scenarios Found.")
 # Main Function
 def main():
     
@@ -1401,7 +1475,7 @@ def main():
 
     # Inventory and Stock Health Reports
 
-    show_latest_inventory_snapshot(connection)
+    #show_latest_inventory_snapshot(connection)
     #show_weeks_on_hand_report(connection)
     #show_low_weeks_on_hand(connection)
     #show_inventory_exceptions(connection)
@@ -1421,6 +1495,9 @@ def main():
     #show_top_300_by_units(connection)
     #show_low_margin_items(connection)
     #show_price_cost_changes(connection)
+
+    # Order Scenario and Weekly Order Planning Queries
+    show_order_scenarios(connection)
 
     connection.close()
 
