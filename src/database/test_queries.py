@@ -270,7 +270,6 @@ def show_products_not_in_pos(connection):
     else:
         print("\nAll Products are in POS.")
 
-
 # Function to show latest Inventory Batch Summary
 def show_latest_inventory_batch_summary(connection):
     cursor = connection.cursor()
@@ -510,7 +509,6 @@ def show_product_quantity(connection):
 
         print(f"{sku:<10} {product_name:<35} {quantity_on_hand:>15}")
     
-
 # Function to show latest inventory snapshot
 def show_latest_inventory_snapshot(connection):
     cursor = connection.cursor()
@@ -1382,6 +1380,7 @@ def show_order_scenarios(connection):
 
     cursor.execute("""
         SELECT
+            os.OrderScenarioId,
             os.ScenarioName,
             os.ScenarioDate,
             v.VendorName,
@@ -1422,7 +1421,7 @@ def show_order_scenarios(connection):
         print("-" * 168)
 
         for row in results:
-            scenario_name, scenario_date, vendor, contact_name, notes, budget = row
+            scenario_id, scenario_name, scenario_date, vendor, contact_name, notes, budget = row
 
             scenario_name = scenario_name or "No Name"
             vendor = vendor or "No Vendor Assigned"
@@ -1452,6 +1451,76 @@ def show_order_scenarios(connection):
 
     else:
         print("No Order Scenarios Found.")
+
+def show_order_scenario_detail(connection, scenario_id):
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            OrderScenario.ScenarioName,
+            Product.SKU,
+            COALESCE(
+                Product.ProductName,
+                OrderScenarioItem.TempProductName
+            ) AS ProductName,
+            COALESCE(
+                Product.Size,
+                OrderScenarioItem.TempSize
+            ) AS Size,
+            OrderScenarioItem.ProposedCases,
+            OrderScenarioItem.ProposedBottles,
+            OrderScenarioItem.TempNotes
+        FROM OrderScenarioItem
+        JOIN OrderScenario
+            ON OrderScenarioItem.OrderScenarioId =
+               OrderScenario.OrderScenarioId
+        LEFT JOIN Product
+            ON OrderScenarioItem.ProductId = Product.ProductId
+        WHERE OrderScenarioItem.OrderScenarioId = ?
+        ORDER BY ProductName
+    """, (scenario_id,))
+
+    results = cursor.fetchall()
+
+    if not results:
+        print(f"\nNo order scenario was found for ID {scenario_id}.")
+        return
+
+    scenario_name = results[0][0]
+
+    print(f"\nOrder Scenario: {scenario_name}")
+    print(f"Scenario ID: {scenario_id}\n")
+
+    print(
+        f"{'SKU':<12}"
+        f"{'Product':<40}"
+        f"{'Size':>12}"
+        f"{'Cases':>10}"
+        f"{'Bottles':>10}"
+        f"  {'Notes'}"
+    )
+
+    print("-" * 105)
+
+    for row in results:
+        _, sku, product_name, size, cases, bottles, notes = row
+
+        sku = str(sku) if sku is not None else "New Product"
+        product_name = product_name or "Unnamed Product"
+        size = size or ""
+        cases = cases or 0
+        bottles = bottles or 0
+        notes = notes or ""
+
+        print(
+            f"{sku:<12}"
+            f"{product_name:<40}"
+            f"{size:>12}"
+            f"{cases:>10}"
+            f"{bottles:>10}"
+            f"{notes}"
+        )
+
 # Main Function
 def main():
     
@@ -1498,6 +1567,7 @@ def main():
 
     # Order Scenario and Weekly Order Planning Queries
     show_order_scenarios(connection)
+    show_order_scenario_detail(connection,1)
 
     connection.close()
 
