@@ -1567,7 +1567,7 @@ def main():
 
     # Order Scenario and Weekly Order Planning Queries
     show_order_scenarios(connection)
-    show_order_scenario_detail(connection,1)
+    #show_order_scenario_detail(connection,1)
 
     connection.close()
 
